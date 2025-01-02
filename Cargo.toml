@@ -1,0 +1,11 @@
+[package]
+name = "notes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.83"
+axum = "0.8.1"
+config = "0.15.4"
+sqlx = { version = "0.8.2", features = ["runtime-tokio", "tls-rustls", "postgres"] }
+tokio = { version = "1.42.0", features = ["full"] }
