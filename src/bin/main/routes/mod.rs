@@ -1,40 +1,68 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
+    extract::{Json, State},
+    http::StatusCode,
     response::{IntoResponse, Response},
-    routing::get,
-    *,
+    routing::{delete, get, post},
 };
-use http::StatusCode;
 
-use crate::domains::notes::NoteRepository;
+use crate::{repositories::notes::NoteRepository, services::notes::NoteService};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AppState {
-    pub note_repository: Arc<impl NoteRepository>,
+    pub note_service: Arc<dyn NoteService>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(note_service: impl NoteService) -> Self {
         Self {
-            ost: "Hej".into(),
+            note_service: Arc::new(note_service),
         }
     }
 }
 
 pub mod notes {
-    use extract::State;
+    use ::notes::CreateNote;
+
+    use crate::domains::notes::{CreateNoteError, GetNotesError};
 
     use super::*;
 
     pub fn routes() -> Router<AppState> {
-        Router::new().route("/", get(get_notes))
+        Router::new()
+            .route("/", get(get_notes))
+            .route("/", post(create_note))
     }
 
     async fn get_notes(State(state): State<AppState>) -> Response {
-        let AppState { ost } = state;
+        let AppState { note_service } = state;
 
-        (StatusCode::OK, ost).into_response()
+        let notes = match note_service.get_notes().await {
+            Ok(notes) => notes,
+            Err(GetNotesError::Other) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR,).into_response();
+            }
+        };
+
+        (StatusCode::OK, Json(notes)).into_response()
+    }
+
+    async fn create_note(
+        State(state): State<AppState>,
+        Json(req): Json<CreateNote>,
+    ) -> Response {
+        let AppState { note_service } = state;
+
+        let note = match note_service.create_note(req).await {
+            Ok(note) => {note},
+            Err(CreateNoteError::Other) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR,).into_response();
+            },
+        };
+
+        (StatusCode::OK, Json(note)).into_response()
     }
 }
 
